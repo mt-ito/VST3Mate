@@ -3,6 +3,7 @@
 #include "CharacterComponent.h"
 #include "BinarySpriteLoader.h"
 #include "PluginProcessor.h"
+#include "AffinitySystem.h"
 
 class VST3MateEditor : public juce::AudioProcessorEditor,
                        private juce::Timer
@@ -20,7 +21,10 @@ private:
     void applyOscSettings();
     void loadCharacterAssets();
     void setupOscCallbacks();
+    void setupAffinityCallbacks();
     void showNotePopup(int noteNumber);
+    void onMotionTriggered(const juce::String& motionName);
+    void paintAffinityBar(juce::Graphics& g, juce::Rectangle<int> bounds);
 
     VST3MateProcessor& processor_;
 
@@ -42,6 +46,9 @@ private:
     // --- Note popup ---
     juce::String       lastNoteText_;
     int                notePopupFrames_ = 0;
+
+    // --- Affinity bar ---
+    juce::Label        affinityLabel_;
 
     // --- Status label ---
     juce::Label        statusLabel_;

@@ -1,7 +1,16 @@
 #pragma once
 #include <JuceHeader.h>
 
-enum class AnimState { Idle, Clicked, Triggered };
+enum class AnimState
+{
+    Idle,
+    Clicked,
+    Triggered,
+    Happy,    // 好感度: Friend以上でランダム発火
+    Excited,  // 好感度: Close以上でランダム発火
+    Love,     // 好感度: Love でランダム発火
+    Shy,      // 好感度: Neutral でランダム発火
+};
 
 class CharacterComponent : public juce::Component, private juce::Timer
 {
@@ -17,9 +26,15 @@ public:
     // Load idle and click animation directories
     void loadAnimations(const juce::File& idleDir, const juce::File& clickedDir);
 
-    // Set frames directly from image arrays (e.g., from BinaryData)
+    // Set all frame sets directly from image arrays (e.g., from BinaryData)
     void setFrames(std::vector<juce::Image> idleFrames,
                    std::vector<juce::Image> clickedFrames);
+
+    // Set individual affinity-state frames
+    void setAffinityFrames(std::vector<juce::Image> happyFrames,
+                           std::vector<juce::Image> excitedFrames,
+                           std::vector<juce::Image> loveFrames,
+                           std::vector<juce::Image> shyFrames);
 
     void setAnimState(AnimState state);
     AnimState getAnimState() const { return currentState_; }
@@ -37,16 +52,18 @@ private:
 
     std::vector<juce::Image> idleFrames_;
     std::vector<juce::Image> clickedFrames_;
+    std::vector<juce::Image> happyFrames_;
+    std::vector<juce::Image> excitedFrames_;
+    std::vector<juce::Image> loveFrames_;
+    std::vector<juce::Image> shyFrames_;
 
     AnimState currentState_ = AnimState::Idle;
     int       currentFrame_ = 0;
     int       fps_          = 10;
 
-    // After a click/trigger animation finishes, revert to idle
     bool revertToIdleAfterCycle_ = false;
 
     ClickCallback clickCallback_;
 
-    // Fallback drawn character when no frames loaded
     void paintFallbackCharacter(juce::Graphics& g);
 };

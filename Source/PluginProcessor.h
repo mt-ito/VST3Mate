@@ -3,6 +3,7 @@
 #include "NoteGenerator.h"
 #include "OscHandler.h"
 #include "ExtensionManager.h"
+#include "AffinitySystem.h"
 
 struct PendingNote
 {
@@ -48,9 +49,10 @@ public:
     // Called from OSC receive
     void triggerNote(int noteNumber, float velocity, float durationSec);
 
-    NoteGenerator&   getNoteGenerator()   { return noteGenerator_; }
-    OscHandler&      getOscHandler()      { return oscHandler_; }
+    NoteGenerator&    getNoteGenerator()    { return noteGenerator_; }
+    OscHandler&       getOscHandler()       { return oscHandler_; }
     ExtensionManager& getExtensionManager() { return extensionManager_; }
+    AffinitySystem&   getAffinitySystem()   { return affinitySystem_; }
 
     void applyConfigFromExtensions();
 
@@ -60,6 +62,7 @@ private:
     ExtensionManager extensionManager_;
     NoteGenerator    noteGenerator_;
     OscHandler       oscHandler_;
+    AffinitySystem   affinitySystem_;
 
     juce::Array<PendingNote> pendingNotes_;
     juce::CriticalSection    noteLock_;

@@ -53,12 +53,25 @@ void CharacterComponent::setFrames(std::vector<juce::Image> idleFrames,
     repaint();
 }
 
+void CharacterComponent::setAffinityFrames(std::vector<juce::Image> happyFrames,
+                                            std::vector<juce::Image> excitedFrames,
+                                            std::vector<juce::Image> loveFrames,
+                                            std::vector<juce::Image> shyFrames)
+{
+    happyFrames_   = std::move(happyFrames);
+    excitedFrames_ = std::move(excitedFrames);
+    loveFrames_    = std::move(loveFrames);
+    shyFrames_     = std::move(shyFrames);
+}
+
 void CharacterComponent::setAnimState(AnimState state)
 {
     if (currentState_ == state) return;
     currentState_ = state;
     currentFrame_ = 0;
-    revertToIdleAfterCycle_ = (state == AnimState::Clicked || state == AnimState::Triggered);
+
+    // 一発モーション (再生後 Idle に戻る)
+    revertToIdleAfterCycle_ = (state != AnimState::Idle);
     repaint();
 }
 
@@ -86,7 +99,7 @@ void CharacterComponent::advanceFrame()
 
     if (revertToIdleAfterCycle_ && currentFrame_ == 0)
     {
-        currentState_          = AnimState::Idle;
+        currentState_           = AnimState::Idle;
         revertToIdleAfterCycle_ = false;
     }
     repaint();
@@ -94,12 +107,21 @@ void CharacterComponent::advanceFrame()
 
 const std::vector<juce::Image>& CharacterComponent::currentFrames() const
 {
+    auto fallbackToIdle = [this]() -> const std::vector<juce::Image>& { return idleFrames_; };
+
     switch (currentState_)
     {
         case AnimState::Clicked:
         case AnimState::Triggered:
-            if (!clickedFrames_.empty()) return clickedFrames_;
-            [[fallthrough]];
+            return clickedFrames_.empty()  ? fallbackToIdle() : clickedFrames_;
+        case AnimState::Happy:
+            return happyFrames_.empty()    ? fallbackToIdle() : happyFrames_;
+        case AnimState::Excited:
+            return excitedFrames_.empty()  ? fallbackToIdle() : excitedFrames_;
+        case AnimState::Love:
+            return loveFrames_.empty()     ? fallbackToIdle() : loveFrames_;
+        case AnimState::Shy:
+            return shyFrames_.empty()      ? fallbackToIdle() : shyFrames_;
         default:
             return idleFrames_;
     }
@@ -128,26 +150,24 @@ void CharacterComponent::mouseDown(const juce::MouseEvent& /*e*/)
 
 void CharacterComponent::paintFallbackCharacter(juce::Graphics& g)
 {
-    // Simple drawn mascot when no sprites are loaded
     auto bounds = getLocalBounds().toFloat().reduced(10.f);
 
-    // Body
     g.setColour(juce::Colours::lightblue);
     g.fillEllipse(bounds.withSizeKeepingCentre(bounds.getWidth() * 0.6f, bounds.getHeight() * 0.7f));
 
-    // Head
     float headR = bounds.getWidth() * 0.28f;
     float headX = bounds.getCentreX() - headR;
     float headY = bounds.getY() + 4.f;
     g.setColour(juce::Colours::peachpuff);
     g.fillEllipse(headX, headY, headR * 2.f, headR * 2.f);
 
-    // Eyes (animate blink on click)
     float eyeY = headY + headR * 0.6f;
     g.setColour(juce::Colours::darkblue);
-    if (currentState_ == AnimState::Clicked && currentFrame_ < 2)
+
+    bool eyeClosed = (currentState_ == AnimState::Clicked && currentFrame_ < 2)
+                  || (currentState_ == AnimState::Shy);
+    if (eyeClosed)
     {
-        // Closed eyes (lines)
         g.drawLine(headX + headR * 0.5f, eyeY, headX + headR * 0.8f, eyeY, 2.f);
         g.drawLine(headX + headR * 1.2f, eyeY, headX + headR * 1.5f, eyeY, 2.f);
     }
@@ -157,18 +177,37 @@ void CharacterComponent::paintFallbackCharacter(juce::Graphics& g)
         g.fillEllipse(headX + headR * 1.2f, eyeY - 4.f, 8.f, 8.f);
     }
 
-    // Smile
     juce::Path smile;
     smile.addArc(headX + headR * 0.4f, eyeY + 6.f, headR * 1.2f, headR * 0.6f,
                  0.2f, juce::MathConstants<float>::pi - 0.2f);
     g.setColour(juce::Colours::darkred);
     g.strokePath(smile, juce::PathStrokeType(2.f));
 
-    // Note icon overlay when clicked
-    if (currentState_ == AnimState::Clicked || currentState_ == AnimState::Triggered)
+    // 状態オーバーレイ
+    g.setFont(juce::Font(22.f));
+    switch (currentState_)
     {
-        g.setColour(juce::Colours::gold.withAlpha(0.85f));
-        g.setFont(juce::Font(24.f));
-        g.drawText(juce::String::fromUTF8("♪"), getLocalBounds(), juce::Justification::topRight);
+        case AnimState::Clicked:
+        case AnimState::Triggered:
+            g.setColour(juce::Colours::gold.withAlpha(0.85f));
+            g.drawText(juce::String::fromUTF8("\u266a"), getLocalBounds(), juce::Justification::topRight);
+            break;
+        case AnimState::Happy:
+            g.setColour(juce::Colours::yellow.withAlpha(0.9f));
+            g.drawText("*", getLocalBounds(), juce::Justification::topRight);
+            break;
+        case AnimState::Excited:
+            g.setColour(juce::Colours::orangered.withAlpha(0.9f));
+            g.drawText("!", getLocalBounds(), juce::Justification::topRight);
+            break;
+        case AnimState::Love:
+            g.setColour(juce::Colours::hotpink.withAlpha(0.9f));
+            g.drawText(juce::String::fromUTF8("\u2665"), getLocalBounds(), juce::Justification::topRight);
+            break;
+        case AnimState::Shy:
+            g.setColour(juce::Colours::lightpink.withAlpha(0.8f));
+            g.drawText("~", getLocalBounds(), juce::Justification::topRight);
+            break;
+        default: break;
     }
 }

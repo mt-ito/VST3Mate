@@ -15,8 +15,12 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(JUCE)
 
 # Assets/sprites 以下の PNG をバイナリデータとして埋め込む
-file(GLOB IDLE_SPRITES    CONFIGURE_DEPENDS "Assets/sprites/idle/*.png")
-file(GLOB CLICKED_SPRITES CONFIGURE_DEPENDS "Assets/sprites/clicked/*.png")
+file(GLOB IDLE_SPRITES     CONFIGURE_DEPENDS "Assets/sprites/idle/*.png")
+file(GLOB CLICKED_SPRITES  CONFIGURE_DEPENDS "Assets/sprites/clicked/*.png")
+file(GLOB HAPPY_SPRITES    CONFIGURE_DEPENDS "Assets/sprites/happy/*.png")
+file(GLOB EXCITED_SPRITES  CONFIGURE_DEPENDS "Assets/sprites/excited/*.png")
+file(GLOB LOVE_SPRITES     CONFIGURE_DEPENDS "Assets/sprites/love/*.png")
+file(GLOB SHY_SPRITES      CONFIGURE_DEPENDS "Assets/sprites/shy/*.png")
 
 juce_add_binary_data(VST3MateBinaryData
     HEADER_NAME  BinaryData.h
@@ -24,6 +28,10 @@ juce_add_binary_data(VST3MateBinaryData
     SOURCES
         ${IDLE_SPRITES}
         ${CLICKED_SPRITES}
+        ${HAPPY_SPRITES}
+        ${EXCITED_SPRITES}
+        ${LOVE_SPRITES}
+        ${SHY_SPRITES}
 )
 
 juce_add_plugin(VST3Mate
@@ -48,6 +56,7 @@ target_sources(VST3Mate
         Source/OscHandler.cpp
         Source/NoteGenerator.cpp
         Source/ExtensionManager.cpp
+        Source/AffinitySystem.cpp
 )
 
 target_compile_definitions(VST3Mate

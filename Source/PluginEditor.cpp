@@ -9,9 +9,9 @@ static juce::String midiNoteToName(int note)
 VST3MateEditor::VST3MateEditor(VST3MateProcessor& p)
     : AudioProcessorEditor(&p), processor_(p)
 {
-    setSize(400, 520);
+    setSize(400, 560);
     setResizable(true, true);
-    setResizeLimits(300, 400, 800, 900);
+    setResizeLimits(300, 440, 800, 960);
 
     // Character
     addAndMakeVisible(character_);
@@ -38,6 +38,11 @@ VST3MateEditor::VST3MateEditor(VST3MateProcessor& p)
         processor_.getExtensionManager().getConfigMutable().scaleName = name;
     };
 
+    // Affinity label
+    addAndMakeVisible(affinityLabel_);
+    affinityLabel_.setJustificationType(juce::Justification::centredLeft);
+    affinityLabel_.setFont(juce::Font(11.f));
+
     // Status
     addAndMakeVisible(statusLabel_);
     statusLabel_.setJustificationType(juce::Justification::centred);
@@ -45,6 +50,7 @@ VST3MateEditor::VST3MateEditor(VST3MateProcessor& p)
 
     loadCharacterAssets();
     setupOscCallbacks();
+    setupAffinityCallbacks();
 
     startTimer(50); // 20fps for UI updates
 }
@@ -102,9 +108,13 @@ void VST3MateEditor::loadCharacterAssets()
     const auto& cfg = processor_.getExtensionManager().getConfig();
     character_.setFps(cfg.animFps);
 
-    // 1. まずバイナリデータ（Assets/sprites/）からロード（デフォルト）
+    // 1. バイナリデータ（Assets/sprites/）からロード（デフォルト）
     auto idleFrames    = BinarySpriteLoader::loadIdleFrames();
     auto clickedFrames = BinarySpriteLoader::loadClickedFrames();
+    auto happyFrames   = BinarySpriteLoader::loadByKeyword("happy_");
+    auto excitedFrames = BinarySpriteLoader::loadByKeyword("excited_");
+    auto loveFrames    = BinarySpriteLoader::loadByKeyword("love_");
+    auto shyFrames     = BinarySpriteLoader::loadByKeyword("shy_");
 
     // 2. AppData のカスタムスプライトがあればそちらで上書き
     auto extDir     = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
@@ -116,6 +126,40 @@ void VST3MateEditor::loadCharacterAssets()
         character_.loadAnimations(idleDir, clickedDir);
     else
         character_.setFrames(std::move(idleFrames), std::move(clickedFrames));
+
+    // 好感度アニメーションは常にバイナリデータから（カスタム上書き未対応の状態）
+    character_.setAffinityFrames(std::move(happyFrames),
+                                  std::move(excitedFrames),
+                                  std::move(loveFrames),
+                                  std::move(shyFrames));
+}
+
+void VST3MateEditor::setupAffinityCallbacks()
+{
+    processor_.getAffinitySystem().setMotionCallback([this](const juce::String& motionName)
+    {
+        // AffinitySystem::Timer は message thread で発火するので callAsync 不要
+        onMotionTriggered(motionName);
+    });
+
+    processor_.getAffinitySystem().setLevelCallback([this](AffinitySystem::Level newLevel)
+    {
+        auto name = AffinitySystem::levelName(newLevel);
+        statusLabel_.setText("Level Up: " + name + "!", juce::dontSendNotification);
+        repaint(); // affinity bar update
+    });
+}
+
+void VST3MateEditor::onMotionTriggered(const juce::String& motionName)
+{
+    if (motionName == AffinitySystem::MOTION_SHY)
+        character_.setAnimState(AnimState::Shy);
+    else if (motionName == AffinitySystem::MOTION_HAPPY)
+        character_.setAnimState(AnimState::Happy);
+    else if (motionName == AffinitySystem::MOTION_EXCITED)
+        character_.setAnimState(AnimState::Excited);
+    else if (motionName == AffinitySystem::MOTION_LOVE)
+        character_.setAnimState(AnimState::Love);
 }
 
 void VST3MateEditor::setupOscCallbacks()
@@ -168,6 +212,37 @@ void VST3MateEditor::timerCallback()
         --notePopupFrames_;
         repaint();
     }
+
+    // 好感度ラベルを定期更新
+    auto& aff = processor_.getAffinitySystem();
+    auto levelStr = AffinitySystem::levelName(aff.getLevel());
+    affinityLabel_.setText(levelStr + "  " + juce::String(aff.getPoints()) + " / 1000",
+                           juce::dontSendNotification);
+}
+
+void VST3MateEditor::paintAffinityBar(juce::Graphics& g, juce::Rectangle<int> bounds)
+{
+    auto& aff   = processor_.getAffinitySystem();
+    float prog  = aff.getProgress();
+    auto level  = aff.getLevel();
+
+    // 色をレベルで変える
+    juce::Colour barColour;
+    switch (level)
+    {
+        case AffinitySystem::Level::Neutral: barColour = juce::Colour(0xff6b8cba); break;
+        case AffinitySystem::Level::Friend:  barColour = juce::Colour(0xff6bba7f); break;
+        case AffinitySystem::Level::Close:   barColour = juce::Colour(0xffffcc55); break;
+        case AffinitySystem::Level::Love:    barColour = juce::Colour(0xffff6b9d); break;
+    }
+
+    auto r = bounds.toFloat();
+    g.setColour(juce::Colour(0xff2e2e3e));
+    g.fillRoundedRectangle(r, 4.f);
+    g.setColour(barColour);
+    g.fillRoundedRectangle(r.withWidth(r.getWidth() * prog), 4.f);
+    g.setColour(juce::Colours::white.withAlpha(0.4f));
+    g.drawRoundedRectangle(r, 4.f, 1.f);
 }
 
 void VST3MateEditor::paint(juce::Graphics& g)
@@ -189,6 +264,12 @@ void VST3MateEditor::paint(juce::Graphics& g)
                    character_.getBounds().translated(10, -20).withHeight(40),
                    juce::Justification::centred);
     }
+
+    // Affinity bar (rendered in paint because it needs custom drawing)
+    auto barBounds = affinityLabel_.getBounds().withLeft(affinityLabel_.getRight() + 4)
+                                               .withRight(getWidth() - 10)
+                                               .reduced(0, 4);
+    paintAffinityBar(g, barBounds);
 }
 
 void VST3MateEditor::resized()
@@ -200,6 +281,12 @@ void VST3MateEditor::resized()
     int charSize = juce::jmin(area.getWidth(), area.getHeight() / 2);
     character_.setBounds(area.removeFromTop(charSize).withSizeKeepingCentre(charSize, charSize));
     area.removeFromTop(6);
+
+    // Affinity bar row
+    auto affRow = area.removeFromTop(20);
+    affinityLabel_.setBounds(affRow.removeFromLeft(120));
+    // remaining space is drawn in paint() as the bar
+    area.removeFromTop(4);
 
     // Scale selector
     auto scaleRow = area.removeFromTop(26);

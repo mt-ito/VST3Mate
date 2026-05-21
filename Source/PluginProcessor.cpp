@@ -92,6 +92,10 @@ NoteEvent VST3MateProcessor::triggerRandomNote()
     const auto& cfg = extensionManager_.getConfig();
     oscHandler_.sendNote(ev.noteNumber, ev.velocity, ev.durationSeconds, cfg.oscNoteAddress);
     oscHandler_.sendState("clicked", cfg.oscStateAddress);
+
+    // クリックするたびに好感度 +5
+    affinitySystem_.addAffinity(5);
+
     return ev;
 }
 
@@ -121,13 +125,19 @@ juce::AudioProcessorEditor* VST3MateProcessor::createEditor()
 void VST3MateProcessor::getStateInformation(juce::MemoryBlock& dest)
 {
     extensionManager_.saveConfig();
-    auto json = juce::JSON::toString(juce::var(extensionManager_.getConfig().scaleName), false);
-    dest.replaceAll(json.toRawUTF8(), json.getNumBytesAsUTF8());
+
+    juce::ValueTree state("VST3MateState");
+    affinitySystem_.saveToValueTree(state);
+
+    juce::MemoryOutputStream stream(dest, false);
+    state.writeToStream(stream);
 }
 
-void VST3MateProcessor::setStateInformation(const void* /*data*/, int /*sizeInBytes*/)
+void VST3MateProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
-    // Config is stored in the extensions/config.json file; state is reloaded on construction
+    auto state = juce::ValueTree::readFromData(data, (size_t)sizeInBytes);
+    if (state.isValid())
+        affinitySystem_.loadFromValueTree(state);
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
