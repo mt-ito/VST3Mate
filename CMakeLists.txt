@@ -83,3 +83,44 @@ target_link_libraries(VST3Mate
 )
 
 juce_generate_juce_header(VST3Mate)
+
+# ─── Unit Tests ───────────────────────────────────────────────────────────────
+enable_testing()
+
+juce_add_console_app(VST3MateTests
+    PRODUCT_NAME "VST3MateTests"
+)
+
+juce_generate_juce_header(VST3MateTests)
+
+target_sources(VST3MateTests
+    PRIVATE
+        Tests/TestMain.cpp
+        Tests/NoteGeneratorTest.cpp
+        Tests/AffinitySystemTest.cpp
+        Tests/ExtensionManagerTest.cpp
+        Source/NoteGenerator.cpp
+        Source/AffinitySystem.cpp
+        Source/ExtensionManager.cpp
+)
+
+target_compile_definitions(VST3MateTests
+    PRIVATE
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+        JUCE_UNIT_TESTS=1
+)
+
+target_include_directories(VST3MateTests
+    PRIVATE Source
+)
+
+target_link_libraries(VST3MateTests
+    PRIVATE
+        juce::juce_core
+        juce::juce_events
+        juce::juce_data_structures
+        juce::juce_recommended_config_flags
+)
+
+add_test(NAME VST3MateTests COMMAND VST3MateTests)
