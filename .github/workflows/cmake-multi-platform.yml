@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: ["**"]
+    tags: ["v*"]
   pull_request:
     branches: ["**"]
 
@@ -19,21 +20,16 @@ jobs:
             os: ubuntu-latest
             c_compiler: gcc
             cpp_compiler: g++
-          - name: "Ubuntu Clang"
-            os: ubuntu-latest
-            c_compiler: clang
-            cpp_compiler: clang++
-          - name: "macOS Clang"
-            os: macos-latest
-            c_compiler: clang
-            cpp_compiler: clang++
+            artifact_name: linux-x86_64
+            for_release: true
           - name: "Windows MSVC"
             os: windows-latest
+            artifact_name: windows-x86_64
+            for_release: true
 
     steps:
       - uses: actions/checkout@v4
 
-      # Cache JUCE source to avoid re-cloning on every run
       - name: Cache JUCE source
         uses: actions/cache@v4
         with:
@@ -80,3 +76,69 @@ jobs:
       - name: Test
         working-directory: build
         run: ctest --build-config Release --output-on-failure
+
+      # ── Pack artifacts (release builds only) ──────────────────────────────
+      - name: Pack artifacts (Linux / macOS)
+        if: matrix.for_release == true && runner.os != 'Windows'
+        run: |
+          mkdir -p dist
+          ARTEFACTS=build/VST3Mate_artefacts/Release
+          if [ -d "$ARTEFACTS/VST3" ]; then
+            zip -r dist/VST3Mate-${{ matrix.artifact_name }}-VST3.zip "$ARTEFACTS/VST3"
+          fi
+          if [ -d "$ARTEFACTS/Standalone" ]; then
+            zip -r dist/VST3Mate-${{ matrix.artifact_name }}-Standalone.zip "$ARTEFACTS/Standalone"
+          fi
+
+      - name: Pack artifacts (Windows)
+        if: matrix.for_release == true && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $artefacts = "build\VST3Mate_artefacts\Release"
+          if (Test-Path "$artefacts\VST3") {
+            Compress-Archive -Path "$artefacts\VST3" `
+              -DestinationPath "dist\VST3Mate-${{ matrix.artifact_name }}-VST3.zip" -Force
+          }
+          if (Test-Path "$artefacts\Standalone") {
+            Compress-Archive -Path "$artefacts\Standalone" `
+              -DestinationPath "dist\VST3Mate-${{ matrix.artifact_name }}-Standalone.zip" -Force
+          }
+
+      - name: Upload build artifacts
+        if: matrix.for_release == true
+        uses: actions/upload-artifact@v4
+        with:
+          name: VST3Mate-${{ matrix.artifact_name }}
+          path: dist/*.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  # ── Publish GitHub Release on v* tag ─────────────────────────────────────
+  release:
+    name: Publish Release
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: VST3Mate-*
+          merge-multiple: false
+
+      - name: List downloaded files
+        run: find artifacts -type f | sort
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: VST3Mate ${{ github.ref_name }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          generate_release_notes: true
+          files: artifacts/**/*.zip
