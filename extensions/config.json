@@ -1,0 +1,41 @@
+{
+  "scaleName": "Major",
+  "rootNote": 60,
+  "minOctave": 3,
+  "maxOctave": 6,
+  "minVelocity": 0.5,
+  "maxVelocity": 1.0,
+  "minDuration": 0.25,
+  "maxDuration": 1.0,
+  "oscSendHost": "127.0.0.1",
+  "oscSendPort": 9000,
+  "oscReceivePort": 9001,
+  "oscNoteAddress": "/mascot/note",
+  "oscAnimAddress": "/mascot/anim",
+  "oscStateAddress": "/mascot/state",
+  "idleAnimDir": "idle",
+  "clickAnimDir": "clicked",
+  "animFps": 10,
+  "customScales": [
+    {
+      "name": "Japanese Pentatonic",
+      "intervals": [
+        0,
+        2,
+        5,
+        7,
+        9
+      ]
+    },
+    {
+      "name": "Hirajoshi",
+      "intervals": [
+        0,
+        2,
+        3,
+        7,
+        8
+      ]
+    }
+  ]
+}
